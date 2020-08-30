@@ -1,0 +1,239 @@
+---
+title: "Activity monitoring data"
+author: "Julian Zamudio"
+date: "8/29/2020"
+output: html_document
+---
+# Goal
+
+Perform a exploratory analysis on data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+
+## Extracting  the Zip file
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd('C:/Users/Julian Zamudio/OneDrive - WageningenUR/R/datasciencecoursera/Reproducible research')
+data_f <- 'data_activity.zip'
+data_dir <- './activity'
+
+
+if (!file.exists(data_dir)) {
+    dir.create(data_dir)
+    unzip(zipfile = data_f, exdir = data_dir)
+}
+
+setwd('C:/Users/Julian Zamudio/OneDrive - WageningenUR/R/datasciencecoursera/Reproducible research/activity')
+
+
+```
+
+## reading and prep-procesing the data
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(ggplot2)
+
+mon_act <- as.data.frame(read.csv("activity.csv", header= T))
+non_valid <- is.na(mon_act$steps)
+mon_act1 <- mon_act[!non_valid,]
+m_day <- 60*24
+
+```
+
+## What is mean total number of steps taken per day?
+
+1. Calculate the total number of steps taken per day
+2. Calculate and report the mean and median of the total number of steps taken per day
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+summary_steps <- mon_act1%>%
+group_by(date) %>%
+summarise(steps_day = sum(steps))
+par(mar= c(4,4,4,2))
+g <- ggplot(summary_steps, aes(steps_day)) + geom_histogram(bins = 20) +
+labs(title = "Number steps per day")
+g
+
+# Mean and median of steps per day
+
+
+
+summary_steps %>%
+summarise(mean = mean(steps_day), median = median( steps_day))
+
+
+```
+
+
+
+## What is the average daily activity pattern?
+
+The range to calculate the average of steps across all the days  is made as follows: 
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+fil <- mon_act1[1,2]
+interval <- pull(select(filter(mon_act,date == fil), c(interval)),interval)
+
+```
+
+The mean of the steps per interval across the every day is calculated using the following structure. 
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+r_across <- as.data.frame(matrix(ncol= 2, nrow = 0))
+
+   for (j in interval) {
+     
+     temp = filter(mon_act1, interval == j )
+     int = as.numeric (j )
+     average_across = summarise(temp, mean = mean(steps))
+     rtemp_across <- c(as.numeric(j), average_across[1,1])
+     r_across <- rbind(r_across,rtemp_across)
+     
+   }
+  
+names(r_across)<- c("interval","av_steps")
+  head (r_across, 5) 
+```
+
+
+# Time line  of every 5 minutes for the average steps across all the days. 
+
+```{r}
+
+knitr::opts_chunk$set(echo = TRUE)
+g <- ggplot(r_across, aes(interval,av_steps), na.rm = TRUE) + 
+    geom_line(size = 1) + labs(title = " Average steps per interval per day") +
+    labs(x = "time(minutes)", y = " Average steps")
+g
+
+```
+# Number of NA in the data set
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+table(is.na(mon_act))
+table(non_valid)
+
+
+```
+There is 2304 NA values in the data set.All of them are in the steps variable.  
+
+##Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+mon_replace <- replace(mon_act, is.na(mon_act),0.34)
+
+summary_steps1 <- mon_replace%>%
+group_by(date) %>%
+summarise(steps_day = sum(steps))
+par(mar= c(4,4,4,2))
+g <- ggplot(summary_steps1, aes(steps_day)) + geom_histogram(bins = 20) +
+labs(title = "Number steps per day")
+g
+
+# Mean and median of steps per day
+
+
+
+summary_steps %>%
+summarise(mean = mean(steps_day), median = median( steps_day))
+
+
+```
+
+It is a difference, becuase the missing data is in the interval 0, therefore the distribution now is bimodal. 
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+mon_replace$date <- as.POSIXct(mon_replace$date)
+str(mon_replace)
+mon_replace <- mutate(mon_replace, day = weekdays(date))
+mon_replace$type <- mon_replace$day
+total <- c(1:length(mon_replace$steps))
+
+for (i in total){
+     
+ 
+    if( mon_replace[i,4] == "Sunday") {
+          mon_replace[i,5] = "Weekend"
+        } else if(mon_replace[i,4] == "Saturday"){
+        mon_replace[i,5] = "Weekend"
+        }  else { 
+          
+          mon_replace[i,5] = "Weekday"
+          
+          }
+      
+}
+
+
+
+
+
+```
+
+
+Now we will create the new data set to do the graph
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+r_week_across <- as.data.frame(matrix(ncol= 3, nrow = 0))
+mon_replace$type <- as.factor(mon_replace$type)
+week <- levels(mon_replace$type)
+
+for (i in week) {
+  
+  temp_w = select(filter(mon_replace, type == i), c("steps", "interval", "type"))
+  
+  for (j in interval) {
+     
+        temp = filter(temp_w, interval == j )
+        int = as.numeric (j)
+        average_across = summarise(temp, mean = mean(steps))
+        rweektemp_across <- c(i, int, average_across[1,1])
+        r_week_across <- rbind(r_week_across,rweektemp_across)
+     
+     }
+  }
+names(r_week_across)<- c("type","interval","av_steps")
+r_week_across$type <- as.factor(r_week_across$type)
+r_week_across$interval<- as.numeric(r_week_across$interval)
+r_week_across$av_steps<- as.numeric(r_week_across$av_steps)
+
+```
+
+
+Creating the ghaph 
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+g <- ggplot(r_week_across , aes(interval, av_steps)) + 
+    geom_line( size = 2) + facet_grid(type ~. )
+g
+levels(r_week_across$type) <- c("Weekday", "Weekend")
+```
+
+
+
+
+
+
+
+
+
+
+
+
